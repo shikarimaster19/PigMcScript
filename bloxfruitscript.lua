@@ -1,125 +1,84 @@
--- KT Farm by KT Hub
+-- KT Farm - Auto Level Farm with Simple UI
+local lp = game.Players.LocalPlayer
+local chr = lp.Character or lp.CharacterAdded:Wait()
+local hum = chr:WaitForChild("HumanoidRootPart")
 
--- Load UI Library
-local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
-
--- Window setup
-local Window = OrionLib:MakeWindow({
-    Name = "KT Farm | Blox Fruits",
-    HidePremium = false,
-    SaveConfig = true,
-    ConfigFolder = "KTFarmHub"
-})
-
--- Variables
-getgenv().autoFarm = false
-getgenv().autoSkillZ = false
-getgenv().autoSkillX = false
-getgenv().autoSkillC = false
-
--- Anti-AFK
-pcall(function()
-    local vu = game:service("VirtualUser")
-    game:GetService("Players").LocalPlayer.Idled:connect(function()
-        vu:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
-        wait(1)
-        vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
-    end)
-end)
-
--- Auto Haki
-function enableHaki()
-    local plr = game.Players.LocalPlayer
-    if not plr.Character:FindFirstChild("HasBuso") then
-        game:GetService("VirtualInputManager"):SendKeyEvent(true, "J", false, game)
-        wait(0.2)
-        game:GetService("VirtualInputManager"):SendKeyEvent(false, "J", false, game)
-    end
+-- Function to get current level
+local function getLevel()
+    return lp.Data.Level.Value
 end
 
--- Get enemy
-function getEnemy()
-    local enemies = workspace.Enemies:GetChildren()
-    for i, v in pairs(enemies) do
-        if v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
-            return v
+-- Simple level-based quest system (you can expand it)
+local quests = {
+    {level = 10, questName = "Bandit", questNPC = "Bandit Quest Giver", enemyName = "Bandit"},
+    {level = 30, questName = "Gorilla", questNPC = "Jungle Quest Giver", enemyName = "Gorilla"},
+    {level = 60, questName = "Pirate", questNPC = "Pirate Quest Giver", enemyName = "Pirate"},
+    -- Add more quests here...
+}
+
+-- Function to find current quest info
+local function getQuest()
+    local lvl = getLevel()
+    for i = #quests, 1, -1 do
+        if lvl >= quests[i].level then
+            return quests[i]
         end
     end
-    return nil
 end
+
+-- UI setup
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0, 200, 0, 100)
+Frame.Position = UDim2.new(0, 20, 0.5, -50)
+Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Frame.BorderSizePixel = 0
+
+local Toggle = Instance.new("TextButton", Frame)
+Toggle.Size = UDim2.new(1, 0, 1, 0)
+Toggle.Text = "KT Farm OFF"
+Toggle.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+Toggle.TextColor3 = Color3.new(1, 1, 1)
+Toggle.Font = Enum.Font.SourceSansBold
+Toggle.TextSize = 20
+
+local farming = false
+
+Toggle.MouseButton1Click:Connect(function()
+    farming = not farming
+    Toggle.Text = farming and "KT Farm ON" or "KT Farm OFF"
+    Toggle.BackgroundColor3 = farming and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(255, 50, 50)
+end)
 
 -- Farm loop
-spawn(function()
-    while wait(0.1) do
-        if autoFarm then
-            pcall(function()
-                enableHaki()
-                local mob = getEnemy()
-                if mob then
-                    repeat wait(0.2)
-                        game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = mob.HumanoidRootPart.CFrame * CFrame.new(0,5,3)
-                        game:GetService("VirtualInputManager"):SendMouseButtonEvent(0,0,0,true,game,0)
-                        wait(0.05)
-                        game:GetService("VirtualInputManager"):SendMouseButtonEvent(0,0,0,false,game,0)
-                    until mob.Humanoid.Health <= 0 or not autoFarm
+task.spawn(function()
+    while true do
+        if farming then
+            local q = getQuest()
+            if q then
+                -- Auto navigate to quest NPC
+                for _, npc in pairs(workspace.NPCs:GetChildren()) do
+                    if npc.Name == q.questNPC then
+                        hum.CFrame = npc.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+                        wait(1)
+                        fireclickdetector(npc.ClickDetector)
+                        wait(1)
+                        game:GetService("ReplicatedStorage").Remotes.Comm:InvokeServer("StartQuest", q.questName, 1)
+                        break
+                    end
                 end
-            end)
+
+                -- Find and attack enemies
+                for _, mob in pairs(workspace.Enemies:GetChildren()) do
+                    if mob.Name == q.enemyName and mob:FindFirstChild("HumanoidRootPart") and mob.Humanoid.Health > 0 then
+                        repeat
+                            hum.CFrame = mob.HumanoidRootPart.CFrame + Vector3.new(0, 2, 0)
+                            wait(0.2)
+                        until not mob or mob.Humanoid.Health <= 0 or not farming
+                    end
+                end
+            end
         end
+        wait(1)
     end
 end)
-
--- Skill spam
-spawn(function()
-    while wait(1) do
-        if autoSkillZ then
-            keypress(0x5A) wait(0.1) keyrelease(0x5A)
-        end
-        if autoSkillX then
-            keypress(0x58) wait(0.1) keyrelease(0x58)
-        end
-        if autoSkillC then
-            keypress(0x43) wait(0.1) keyrelease(0x43)
-        end
-    end
-end)
-
--- Tabs and toggles
-local MainTab = Window:MakeTab({
-    Name = "Auto Farm",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
-})
-
-MainTab:AddToggle({
-    Name = "Bật Auto Farm",
-    Default = false,
-    Callback = function(v)
-        autoFarm = v
-    end
-})
-
-MainTab:AddToggle({
-    Name = "Tự bật skill Z",
-    Default = false,
-    Callback = function(v)
-        autoSkillZ = v
-    end
-})
-
-MainTab:AddToggle({
-    Name = "Tự bật skill X",
-    Default = false,
-    Callback = function(v)
-        autoSkillX = v
-    end
-})
-
-MainTab:AddToggle({
-    Name = "Tự bật skill C",
-    Default = false,
-    Callback = function(v)
-        autoSkillC = v
-    end
-})
-
-OrionLib:Init()
