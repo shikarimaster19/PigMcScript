@@ -301,5 +301,9 @@ v16.Main:AddButton({
         else
             warn("Không tìm thấy server phù hợp (0-1 người, khác server hiện tại).")
         end
-    end
-})
+    end);
+v14:Notify({
+    Title = "PigMc",
+    Content = "Tải Xong",
+    Duration = 10
+});
